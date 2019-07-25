@@ -223,6 +223,7 @@ if __name__ == "__main__":
         min_list = []
         max_list = []
         D_list = []
+        Mean_list = []
         # Four corners of the billboard in destination image.
         for x in range(0, opencv_image.shape[1]):  # looping through each column
             lst = []
@@ -243,11 +244,16 @@ if __name__ == "__main__":
                     max_list[ind] = k
                 D = max_list[ind] - min_list[ind]
                 D_list.append(D)
-                if D < statistics.mean(D_list):
+                if D > 2/3 *statistics.mean(D_list) and D < 4/3 * statistics.mean(D_list):
+                    T = (max_list[ind] + min_list[ind]) / 2
+                    Mean_list.append(T)
+
+                if D != statistics.mean(D_list):
                     D = statistics.mean(D_list)
-                    T = (max_list[ind] + min_list[ind])//2
-                    max_list[ind] = T + D//2
-                    min_list[ind] = T - D // 2
+                    T = Mean_list[-1]
+                    #T = (max_list[ind] + min_list[ind])/2
+                    max_list[ind] = T + D/2
+                    min_list[ind] = T - D / 2
                 D1 = 0.1 * D
                 max_list[ind] = max_list[ind] - D1
                 min_list[ind] = min_list[ind] + 1.5*D1
