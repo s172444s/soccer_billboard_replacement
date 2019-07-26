@@ -219,6 +219,30 @@ if __name__ == "__main__":
 
         # Read destination image.
         #im_dst = cv2.imread('billboard1.jpg')
+        min_list = []
+        max_list = []
+        D_list = []
+        M_list = []
+        for x in range(0, opencv_image.shape[1]):  # looping through each column
+            lst = []
+            for y in range(0, opencv_image.shape[0]):  # looping through each rows
+                if mask[y, x] > 0:
+                    lst.append(y)
+            if np.any(mask[:, x] > 0):
+                min_list.append(min(lst))
+                max_list.append(max(lst))
+                # print(max_list[x], min_list[x])
+                ind = max_list.index(max(lst))
+                if max_list[ind] < min_list[ind]:
+                    k = min_list[ind]
+                    min_list[ind] = max_list[ind]
+                    max_list[ind] = k
+                D = max_list[ind] - min_list[ind]
+                D_list.append(D)
+                if D > 2/3 *statistics.mean(D_list) and D < 4/3 * statistics.mean(D_list):
+                    T = (max_list[ind] + min_list[ind]) / 2
+                    M_list.append(T)
+        #Mean_D = statistics.mean(D_list)
         im_dst = opencv_image
         min_list = []
         max_list = []
@@ -248,9 +272,11 @@ if __name__ == "__main__":
                     T = (max_list[ind] + min_list[ind]) / 2
                     Mean_list.append(T)
 
-                if D != statistics.mean(D_list):
+                if D != statistics.mean(D_list) and len(Mean_list)<len(M_list):
                     D = statistics.mean(D_list)
-                    T = Mean_list[-1]
+                    #T = Mean_list[-1]
+                    X = len(Mean_list)
+                    T = (M_list[X]+Mean_list[-1])/2
                     #T = (max_list[ind] + min_list[ind])/2
                     max_list[ind] = T + D/2
                     min_list[ind] = T - D / 2
