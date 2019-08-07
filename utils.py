@@ -39,7 +39,7 @@ def resize_and_crop(pilimg, scale=0.25, final_height=None, is_mask=False):
         diff = newH - final_height
 
     #trans = transforms.Compose([transforms.RandomResizedCrop(270)])
-    if is_mask:
+    if is_mask and len(np.array(pilimg).shape) == 3:
         # convert to numpy array, remove alpha channel, convert back to pilimag
         # otherwise pilimg resize will make the image transparent (all black)
         pilimg = np.array(pilimg)
@@ -47,11 +47,13 @@ def resize_and_crop(pilimg, scale=0.25, final_height=None, is_mask=False):
         pilimg = Image.fromarray(pilimg)
         pilimg = pilimg.resize((newW, newH))
         img = pilimg.crop((0, 0, newW, newH))
-        #img = trans(pilimg)
+        # pilimg = pilimg.resize((270, 270))
+        # img = pilimg.crop((0, 0, 270, 270))
     else:
         pilimg = pilimg.resize((newW, newH))
         img = pilimg.crop((0, 0, newW, newH))
-        #img = trans(pilimg)
+        # pilimg = pilimg.resize((270, 270))
+        # img = pilimg.crop((0, 0, 270, 270))
 
     # plot_img_and_mask(img, img)
     # print(is_mask)
@@ -156,8 +158,16 @@ def to_cropped_imgs(ids, dir, suffix, scale, is_mask=False):
     """From a list of tuples, returns the correct cropped img"""
     for id, pos in ids:
         im = resize_and_crop(Image.open(dir + id + suffix), scale=scale, is_mask=is_mask)
-
-        if is_mask:
+        if len(np.array(im).shape) != 3:
+            import cv2
+            im = np.atleast_3d(im)
+            im = cv2.merge((im, im, im))
+        #import cv2
+        # cv2.imwrite("test2.png", im*255)
+        # exit(0)
+        # print(np.array(im).shape)
+        # exit(0)
+        if is_mask and len(np.array(im).shape) == 3:
             # change to mask 0 or 1, 1 is for billboards
             im = im.any(axis=2, keepdims=True).astype(im.dtype)
             # import cv2
@@ -292,7 +302,7 @@ def resize_and_crop_img_and_mask_v2(pilimg_img, pilimg_mask, scale=1, final_heig
         diff = 0
     else:
         diff = newH - final_height
-    if is_mask:
+    if is_mask and len(np.array(pilimg_mask).shape) == 3:
         pilimg_mask = np.array(pilimg_mask)
         pilimg_mask = pilimg_mask[:, :, :3]  # remove alpha channel
         pilimg_mask = Image.fromarray(pilimg_mask)
