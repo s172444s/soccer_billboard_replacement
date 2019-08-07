@@ -9,18 +9,18 @@ import torch.nn as nn
 from torch import optim
 
 from eval import eval_net
-#from Network import UNet
-from Network_v2 import UNet
+from Network import UNet
+#from Network_v2 import UNet
 from utils import get_ids, split_ids, split_train_val, get_imgs_and_masks, get_imgs_and_masks_both, batch
 
 def train_net(net,
-              epochs=10,
-              batch_size=4,
+              epochs=50,
+              batch_size=8,
               lr=0.1,
               val_percent=0.1,
               save_cp=True,
               gpu=True,
-              img_scale=1):
+              img_scale=0.25):
 
     dir_img = 'D:/data_unet/train/'
     dir_mask = 'D:/data_unet/train_masks/'
@@ -58,11 +58,11 @@ def train_net(net,
         net.train()
 
         # reset the generators
-        # train = get_imgs_and_masks(iddataset['train'], dir_img, dir_mask, img_scale)
-        # val = get_imgs_and_masks(iddataset['val'], dir_img, dir_mask, img_scale)
+        train = get_imgs_and_masks(iddataset['train'], dir_img, dir_mask, img_scale)
+        val = get_imgs_and_masks(iddataset['val'], dir_img, dir_mask, img_scale)
 
-        train = get_imgs_and_masks_both(iddataset['train'], dir_img, dir_mask, img_scale)
-        val = get_imgs_and_masks_both(iddataset['val'], dir_img, dir_mask, img_scale)
+        # train = get_imgs_and_masks_both(iddataset['train'], dir_img, dir_mask, img_scale)
+        # val = get_imgs_and_masks_both(iddataset['val'], dir_img, dir_mask, img_scale)
 
         epoch_loss = 0
 
@@ -84,8 +84,8 @@ def train_net(net,
 
             import cv2
             #if i % 1000 == 0:
-            cv2.imwrite("D:/img_and_mask_test/test"+str(epoch)+str(int(i * batch_size / N_train))+str(i)+"_mask.png", true_masks[0, 0, :, :]*255)
-            cv2.imwrite("D:/img_and_mask_test/test" + str(epoch) + str(int(i * batch_size / N_train)) + str(i) + "_img.png",
+            cv2.imwrite("D:/img_and_mask_test/test"+str(epoch)+str(int(i * batch_size / N_train))+str(i)+"_coords.PNG", true_masks[0, :, :, 0]*255)
+            cv2.imwrite("D:/img_and_mask_test/test" + str(epoch) + str(int(i * batch_size / N_train)) + str(i) + "_vis.PNG",
                         imgs[0, 0, :, :] * 255)
 
             imgs = torch.from_numpy(imgs)
@@ -125,9 +125,9 @@ def train_net(net,
 
 def get_args():
     parser = OptionParser()
-    parser.add_option('-e', '--epochs', dest='epochs', default=10, type='int',
+    parser.add_option('-e', '--epochs', dest='epochs', default=50, type='int',
                       help='number of epochs')
-    parser.add_option('-b', '--batch-size', dest='batchsize', default=4,
+    parser.add_option('-b', '--batch-size', dest='batchsize', default=8,
                       type='int', help='batch size')
     parser.add_option('-l', '--learning-rate', dest='lr', default=0.1,
                       type='float', help='learning rate')
@@ -136,7 +136,7 @@ def get_args():
     parser.add_option('-c', '--load', dest='load',
                       default=False, help='load file model')
     parser.add_option('-s', '--scale', dest='scale', type='float',
-                      default=1, help='downscaling factor of the images')
+                      default=0.25, help='downscaling factor of the images')
 
     (options, args) = parser.parse_args()
     return options
