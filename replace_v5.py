@@ -31,6 +31,9 @@ def predict_img(net,
     img = resize_and_crop(full_img, scale=scale_factor)
     img = normalize(img)
 
+    if img.shape[2] == 4:
+        img = img[:,:,0:3]
+
     left_square, right_square = split_img_into_squares(img)
 
     left_square = hwc_to_chw(left_square)
@@ -74,10 +77,10 @@ def predict_img(net,
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', '-m', default='CP1.pth',
+    parser.add_argument('--model', '-m', default='CP1_v3.pth',
                         metavar='FILE',
                         help="Specify the file in which is stored the model"
-                             " (default : 'CP1.pth')")
+                             " (default : 'CP1_v3.pth')")
     parser.add_argument('--input', '-i', metavar='INPUT', nargs='+',
                         help='filenames of input images', required=True)
 
@@ -97,7 +100,7 @@ def get_args():
                         default=False)
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
-                        default=0.1)
+                        default=0.5)
     parser.add_argument('--scale', '-s', type=float,
                         help="Scale factor for the input images",
                         default=0.25)
@@ -211,7 +214,7 @@ if __name__ == "__main__":
         plot_img_and_mask(img, mask)
         #exit(0)
         # Read source image.
-        im_src = cv2.imread('frame1.jpg')
+        im_src = cv2.imread('framex.jpg')
         # Four corners of the billboard in source image
         img_gray = np.mean(im_src, axis=2)
         b, a = np.where(img_gray > 0)
@@ -276,14 +279,31 @@ if __name__ == "__main__":
                     D = statistics.mean(D_list)
                     #T = Mean_list[-1]
                     X = len(Mean_list)
+                    print(X)
+                    print(len(M_list))
                     T = (M_list[X]+Mean_list[-1])/2
                     #T = (max_list[ind] + min_list[ind])/2
                     max_list[ind] = T + D/2
                     min_list[ind] = T - D / 2
+                    print(max_list[ind]-min_list[ind])
+                    print(ind)
                 D1 = 0.1 * D
                 max_list[ind] = max_list[ind] - D1
                 min_list[ind] = min_list[ind] + 1.5*D1
+                print(max_list[len(min_list)-1], min_list[len(min_list)-1])
         length = len(max_list)-1
+        ind = length
+        D = max_list[ind] - min_list[ind]
+        if D != statistics.mean(D_list) and len(Mean_list) == len(M_list):
+            D_mean = statistics.mean(D_list)
+            X = len(Mean_list)
+            T = (M_list[X - 1] + Mean_list[X - 2]) / 2
+            # T = (max_list[ind] + min_list[ind])/2
+            max_list[ind] = T + D_mean / 2
+            min_list[ind] = T - D_mean / 2
+        D1 = 0.1 * D
+        max_list[ind] = max_list[ind] - D1
+        min_list[ind] = min_list[ind] + 1.5 * D1
         angle_list = []
         for x in range(0, length):
             if x > 0 and x < length-200:
@@ -323,11 +343,12 @@ if __name__ == "__main__":
                 cv2.imshow("test", im_dst)
                 cv2.waitKey(0)
             if x % 100 == 0 and x+99 >= length:
+                print(min_list[len(min_list)-1], max_list[len(min_list)-1])
                 pts_dst = np.array(
                     [[x-1, min_list[x-1]], [len(min_list)-1, min_list[len(min_list)-1]], [len(min_list)-1, max_list[len(min_list)-1]], [x-1, max_list[x-1]]])
                 print(pts_dst)
-                print(max(a)-min(a))
                 cropped_src = np.array([[min(a), min(b)], [((length-x)/100)*max(a), min(b)], [((length-x)/100)*max(a), max(b)], [min(a), max(b)]])
+
                 # Calculate Homography
                 h, status = cv2.findHomography(cropped_src, pts_dst)
 
