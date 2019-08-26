@@ -165,7 +165,8 @@ def rob_alg(lst):
         print(len(lst))
     return lst
 
-
+yp0 = 0
+yn0 = 0
 if __name__ == "__main__":
     args = get_args()
     in_files = args.input
@@ -317,6 +318,8 @@ if __name__ == "__main__":
         max_list[ind] = max_list[ind] - D1
         min_list[ind] = min_list[ind] + 1.5 * D1
         angle_list = []
+        if j == 0:
+            pts_src2 = np.array([[min(a), min(b)], [max(a), min(b)], [max(a), max(b)], [min(a), max(b)]])
         if j>0:
             img0 = cv2.imread(image_lst[j-1], cv2.IMREAD_COLOR)
             img1 = cv2.imread(image_lst[j], cv2.IMREAD_COLOR)
@@ -331,9 +334,25 @@ if __name__ == "__main__":
                     dist_points.append(points2[ii][0]-points1[ii][0])
             #print(dist_points[0])
             if dist_points[0] > 0:
-                yp1 = dist_points[0]
+                yp0 = dist_points[0]+yp0
+                if yp0 > 100:#min(b)-min(a):
+                    yp1 = yp0 - 100#(min(b)-min(a))
+                else:
+                    yp1 = yp0
+                pts_src2 = np.array(
+                    [[min(a) + yp1, min(b)], [max(a), min(b)], [max(a), max(b)], [min(a) + yp1, max(b)]])
             else:
-                yn1 = dist_points[0]
+                yp0 = 0
+            if dist_points[0] <= 0:
+                yn0 = -1*dist_points[0] + yn0
+                if yn0 > 100:#min(b)-min(a):
+                    yn1 = yn0 - 100#(min(b)-min(a))
+                else:
+                    yn1 = yn0
+                pts_src2 = np.array(
+                    [[min(b) - yn1, min(b)], [max(a), min(b)], [max(a), max(b)], [min(b) - yn1, max(b)]])
+            else:
+                yn0 = 0
         for x in range(0, length):
             if x > 0 and x < length - 200:
                 # print((180 / np.pi) * angle_between(np.array([0, 1])-np.array([1, 1]), np.array([1, 1])))
@@ -385,7 +404,7 @@ if __name__ == "__main__":
                                     cropped_src = np.array(
                                         [[min(a)+(int(t2+1) / 100) * (max(a)-min(a)), min(b)], [max(a), min(b)],
                                          [max(a), max(b)], [min(a)+(int(t2+1) / 100) * (max(a)-min(a)), max(b)]])
-                                    h3, status3 = cv2.findHomography(cropped_src, pts_dst3)
+                                    h3, status3 = cv2.findHomography(pts_src, pts_dst3)
                                     temp3 = cv2.warpPerspective(im_src, h3, (im_dst.shape[1], im_dst.shape[0]))
                                     cv2.fillConvexPoly(im_dst, pts_dst3.astype(int), 0, 4)
                                     im_dst = im_dst + temp3
@@ -400,7 +419,7 @@ if __name__ == "__main__":
                                     cropped_src = np.array(
                                         [[min(a) + (int(t2 + 1) / 100) * (max(a) - min(a)), min(b)], [max(a), min(b)],
                                          [max(a), max(b)], [min(a) + (int(t2 + 1) / 100) * (max(a) - min(a)), max(b)]])
-                                    h3, status3 = cv2.findHomography(cropped_src, pts_dst3)
+                                    h3, status3 = cv2.findHomography(pts_src, pts_dst3)
                                     temp3 = cv2.warpPerspective(im_src, h3, (im_dst.shape[1], im_dst.shape[0]))
                                     cv2.fillConvexPoly(im_dst, pts_dst3.astype(int), 0, 4)
                                     im_dst = im_dst + temp3
@@ -474,7 +493,7 @@ if __name__ == "__main__":
                                  [len(min_list) - 1, min_list[len(min_list) - 1]],
                                  [len(min_list) - 1, max_list[len(min_list) - 1]],
                                  [x - 1 + int(yn1), max_list[x - 1 + int(yn1)]]])
-                                       
+
                 if j == 0:
                     pts_dst = np.array(
                         [[x - 1, min_list[x - 1]], [len(min_list) - 1, min_list[len(min_list) - 1]],
@@ -485,7 +504,7 @@ if __name__ == "__main__":
                 cropped_src = np.array([[min(a), min(b)], [((length - x) / 100) * max(a), min(b)],
                                         [((length - x) / 100) * max(a), max(b)], [min(a), max(b)]])
                 # Calculate Homography
-                h, status = cv2.findHomography(cropped_src, pts_dst)
+                h, status = cv2.findHomography(pts_src, pts_dst)
 
                 # Warp source image to destination based on homography
                 temp = cv2.warpPerspective(im_src, h, (im_dst.shape[1], im_dst.shape[0]))
@@ -502,14 +521,14 @@ if __name__ == "__main__":
         im_dst[:] = alpha * original_image + (1 - alpha) * im_dst
 
         # cv2.imshow('warpped', im_dst)
-        cv2.imwrite("D:/Frames/frame%d.jpg" % int(j+1068), im_dst)
+        cv2.imwrite("E:/Frames/frame%d.jpg" % int(j+1068), im_dst)
         # cv2.waitKey(0)
 
 import cv2
 import os
 
-image_folder = 'D:/Frames'
-video_name = 'D:/Frames/video_second_set_replaced_v4.avi'
+image_folder = 'E:/Frames'
+video_name = 'E:/Frames/video_second_set_replaced_v4.avi'
 
 images = [img for img in os.listdir(image_folder) if img.endswith(".jpg")]
 frame = cv2.imread(os.path.join(image_folder, images[0]))
