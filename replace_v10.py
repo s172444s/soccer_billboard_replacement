@@ -412,15 +412,20 @@ if __name__ == "__main__":
 
                     # print(pts_dst)
                 else:
-                    if dist_points[0] > 0 and j > 0:
-                        pts_dst = np.array(
-                            [[x - 1-int(yp1), min_list[x - 1-int(yp1)]], [x + 99-int(yp1), min_list[x + 99-int(yp1)]], [x + 99-int(yp1), max_list[x + 99-int(yp1)]],
-                             [x - 1-int(yp1), max_list[x - 1-int(yp1)]]])
+                    if j > 0:
+                        if dist_points[0] > 0:
+                            pts_dst = np.array(
+                                [[x - 1 - int(yp1), min_list[x - 1 - int(yp1)]],
+                                 [x + 99 - int(yp1), min_list[x + 99 - int(yp1)]],
+                                 [x + 99 - int(yp1), max_list[x + 99 - int(yp1)]],
+                                 [x - 1 - int(yp1), max_list[x - 1 - int(yp1)]]])
+                        if dist_points[0] <= 0 and x + 99 + int(yn1) < len(min_list) - 1:
+                            pts_dst = np.array(
+                                [[x - 1 + int(yn1), min_list[x - 1 + int(yn1)]],
+                                 [x + 99 + int(yn1), min_list[x + 99 + int(yn1)]],
+                                 [x + 99 + int(yn1), max_list[x + 99 + int(yn1)]],
+                                 [x - 1 + int(yn1), max_list[x - 1 + int(yn1)]]])
 
-                    if dist_points[0] <= 0 and j > 0 and x + 99+int(yn1)< len(min_list) - 1:
-                        pts_dst = np.array(
-                            [[x - 1+int(yn1), min_list[x - 1+int(yn1)]], [x + 99+int(yn1), min_list[x + 99+int(yn1)]], [x + 99+int(yn1), max_list[x + 99+int(yn1)]],
-                             [x - 1+int(yn1), max_list[x - 1+int(yn1)]]])
                     if j == 0:
                         pts_dst = np.array(
                             [[x - 1, min_list[x - 1]], [x + 99, min_list[x + 99]], [x + 99, max_list[x + 99]],
@@ -454,21 +459,22 @@ if __name__ == "__main__":
                 # cv2.imshow("test", im_dst)
                 # cv2.waitKey(0)
             if x % 100 == 0 and x + 99 >= length:
-                if dist_points[0] > 0 and j > 0:
-                    if len(min_list) - 1 > x - 1 - int(yp1):
-                        pts_dst = np.array(
-                            [[x - 1 - int(yp1), min_list[x - 1 - int(yp1)]],
-                             [len(min_list) - 1, min_list[len(min_list) - 1]],
-                             [len(min_list) - 1, max_list[len(min_list) - 1]],
-                             [x - 1 - int(yp1), max_list[x - 1 - int(yp1)]]])
-
-                if dist_points[0] <= 0 and j > 0:
-                    if len(min_list) - 1 > x - 1 + int(yn1):
-                        pts_dst = np.array(
-                            [[x - 1 + int(yn1), min_list[x - 1 + int(yn1)]],
-                             [len(min_list) - 1, min_list[len(min_list) - 1]],
-                             [len(min_list) - 1, max_list[len(min_list) - 1]],
-                             [x - 1 + int(yn1), max_list[x - 1 + int(yn1)]]])
+                if j > 0:
+                    if dist_points[0] > 0:
+                        if len(min_list) - 1 > x - 1 - int(yp1):
+                            pts_dst = np.array(
+                                [[x - 1 - int(yp1), min_list[x - 1 - int(yp1)]],
+                                 [len(min_list) - 1, min_list[len(min_list) - 1]],
+                                 [len(min_list) - 1, max_list[len(min_list) - 1]],
+                                 [x - 1 - int(yp1), max_list[x - 1 - int(yp1)]]])
+                    else:
+                        if len(min_list) - 1 > x - 1 + int(yn1):
+                            pts_dst = np.array(
+                                [[x - 1 + int(yn1), min_list[x - 1 + int(yn1)]],
+                                 [len(min_list) - 1, min_list[len(min_list) - 1]],
+                                 [len(min_list) - 1, max_list[len(min_list) - 1]],
+                                 [x - 1 + int(yn1), max_list[x - 1 + int(yn1)]]])
+                                       
                 if j == 0:
                     pts_dst = np.array(
                         [[x - 1, min_list[x - 1]], [len(min_list) - 1, min_list[len(min_list) - 1]],
