@@ -29,7 +29,7 @@ def alignImages(im1, im2):
 
     # Draw top matches
     imMatches = cv2.drawMatches(im1, keypoints1, im2, keypoints2, matches, None)
-    cv2.imwrite("matches.jpg", imMatches)
+    cv2.imwrite("E://Frames/matches.jpg", imMatches)
 
     # Extract location of good matches
     points1 = np.zeros((len(matches), 2), dtype=np.float32)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     imReference = cv2.imread(refFilename, cv2.IMREAD_COLOR)
 
     # Read image to be aligned
-    imFilename = "frame1.jpg"
+    imFilename = "frame100.jpg"
     print("Reading image to align : ", imFilename);
     im = cv2.imread(imFilename, cv2.IMREAD_COLOR)
 
@@ -67,9 +67,11 @@ if __name__ == '__main__':
     imReg, h = alignImages(im, imReference)
 
     # Write aligned image to disk.
-    outFilename = "aligned.jpg"
+    outFilename = "E://Frames/aligned.jpg"
     print("Saving aligned image : ", outFilename);
     cv2.imwrite(outFilename, imReg)
+    parallax = (imReg/2 + imReference/2)
+    cv2.imwrite("E://Frames/parallax.jpg", parallax)
 
     # Print estimated homography
     print("Estimated homography : \n", h)
