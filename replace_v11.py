@@ -200,15 +200,23 @@ if __name__ == "__main__":
         image_lst.append(img_name)
         # print('Read a new frame: ', success)
         count += 1
-
+    base = 0
     for j in range(len(image_lst)):
         #for i, fn in enumerate(image_lst[j]):
         # print("\nPredicting image {} ...".format(image_lst[j]))
 
         img = Image.open(image_lst[j])
-        if j > 0:
-            c, d = static_point_detecor_homography(image_lst[0], image_lst[j])
-            point.append(c)
+        if j - base > 0:
+            c, d, e = static_point_detecor_homography(image_lst[base], image_lst[j])
+            if e < 1.5 and e > 0.5:
+                point.append(c)
+            else:
+                base = j - 1
+                if j - base > 0:
+                    c, d, e = static_point_detecor_homography(image_lst[base], image_lst[j])
+                    point.append(c)
+
+
         if img.size[0] < img.size[1]:
             print("Error: image height larger than the width")
 
@@ -432,7 +440,7 @@ if __name__ == "__main__":
         # Draw a circle with blue line borders of thickness of 2 px
 
 
-        if j > 0:
+        if j - base > 0:
             # Center coordinates
             center_coordinates = (int(c), int(d))
             # Make one pixel red
