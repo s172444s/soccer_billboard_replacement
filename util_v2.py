@@ -23,7 +23,9 @@ def homography_matrix(img1, img2):
     im2Gray = cv.cvtColor(im2, cv.COLOR_BGR2GRAY)
 
     # Detect ORB features and compute descriptors.
-    orb = cv.ORB_create(MAX_FEATURES)
+    #orb = cv.ORB_create(MAX_FEATURES)
+    orb = cv2.ORB_create(edgeThreshold=15, patchSize=31, nlevels=8, fastThreshold=20, scaleFactor=1.2, WTA_K=2,
+                         scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0, nfeatures=500000)
     keypoints1, descriptors1 = orb.detectAndCompute(im1Gray, None)
     keypoints2, descriptors2 = orb.detectAndCompute(im2Gray, None)
 
@@ -47,11 +49,167 @@ def homography_matrix(img1, img2):
     points2 = np.zeros((len(matches), 2), dtype=np.float32)
 
     for i, match in enumerate(matches):
+        # print(keypoints1[match.queryIdx].pt[0])
+        # exit(0)
         points1[i, :] = keypoints1[match.queryIdx].pt
         points2[i, :] = keypoints2[match.trainIdx].pt
         #print(points1[i][0] - points2[i][0])
     # Find homography
     matrix, mask = cv.findHomography(points1, points2, cv.RANSAC)
+    #print('Hello')
+    a = np.array(matrix)
+    return a
+
+def homography_matrix_v2(img1, img2):
+    #point = []
+    args = get_args()
+    net = UNet(n_channels=3, n_classes=1)
+    if not args.cpu:
+        print("Using CUDA version of the net, prepare your GPU !")
+        net.cuda()
+        net.load_state_dict(torch.load(args.model))
+    else:
+        net.cpu()
+        net.load_state_dict(torch.load(args.model, map_location='cpu'))
+        print("Using CPU version of the net, this may be very slow")
+    img = cv2.imread(img1, cv2.IMREAD_COLOR)
+    cv.imwrite("frame_test.jpg", img)
+    img = Image.open("frame_test.jpg")
+    mask = predict_img(net=net,
+                       full_img=img,
+                       scale_factor=args.scale,
+                       out_threshold=args.mask_threshold,
+                       use_dense_crf=not args.no_crf,
+                       use_gpu=not args.cpu)
+    numpy_image = np.array(img)
+    opencv_image = cv.cvtColor(numpy_image, cv.COLOR_RGB2BGR)
+    min_list = []
+    max_list = []
+    D_list = []
+    M_list = []
+    for x in range(0, opencv_image.shape[1]):  # looping through each column
+        lst = []
+        for y in range(0, opencv_image.shape[0]):  # looping through each rows
+            if mask[y, x] > 0:
+                lst.append(y)
+        if np.any(mask[:, x] > 0):
+            min_list.append(min(lst))
+            max_list.append(max(lst))
+            # print(max_list[x], min_list[x])
+            ind = max_list.index(max(lst))
+            if max_list[ind] < min_list[ind]:
+                k = min_list[ind]
+                min_list[ind] = max_list[ind]
+                max_list[ind] = k
+            D = max_list[ind] - min_list[ind]
+            D_list.append(D)
+            if D > 2 / 3 * statistics.mean(D_list) and D < 4 / 3 * statistics.mean(D_list):
+                T = (max_list[ind] + min_list[ind]) / 2
+                M_list.append(T)
+    # Mean_D = statistics.mean(D_list)
+    im_dst = opencv_image
+    min_list = []
+    max_list = []
+    D_list = []
+    Mean_list = []
+    # Four corners of the billboard in destination image.
+    for x in range(0, opencv_image.shape[1]):  # looping through each column
+        lst = []
+        for y in range(0, opencv_image.shape[0]):  # looping through each rows
+            if mask[y, x] > 0:
+                lst.append(y)
+        if np.any(mask[:, x] > 0):
+            max_pt = (x, max(lst))
+            min_pt = (x, min(lst))
+            # print(max_pt, min_pt)
+            min_list.append(min(lst))
+            max_list.append(max(lst))
+            # print(max_list[x], min_list[x])
+            ind = max_list.index(max(lst))
+            if max_list[ind] < min_list[ind]:
+                k = min_list[ind]
+                min_list[ind] = max_list[ind]
+                max_list[ind] = k
+            D = max_list[ind] - min_list[ind]
+            D_list.append(D)
+            if D > 2 / 3 * statistics.mean(D_list) and D < 4 / 3 * statistics.mean(D_list):
+                T = (max_list[ind] + min_list[ind]) / 2
+                Mean_list.append(T)
+
+            if D != statistics.mean(D_list) and len(Mean_list) < len(M_list):
+                D = statistics.mean(D_list)
+                # T = Mean_list[-1]
+                X = len(Mean_list)
+                # print(X)
+                # print(len(M_list))
+                T = (M_list[X] + Mean_list[-1]) / 2
+                # T = (max_list[ind] + min_list[ind])/2
+                max_list[ind] = T + D / 2
+                min_list[ind] = T - D / 2
+            D1 = 0.1 * D
+            max_list[ind] = max_list[ind] - D1
+            min_list[ind] = min_list[ind] + 1.5 * D1
+    length = len(max_list) - 1
+    ind = length
+    D = max_list[ind] - min_list[ind]
+    if D != statistics.mean(D_list) and len(Mean_list) == len(M_list):
+        D_mean = statistics.mean(D_list)
+        X = len(Mean_list)
+        T = (M_list[X - 1] + Mean_list[X - 2]) / 2
+        # T = (max_list[ind] + min_list[ind])/2
+        max_list[ind] = T + D_mean / 2
+        min_list[ind] = T - D_mean / 2
+    D1 = 0.1 * D
+    max_list[ind] = max_list[ind] - D1
+    min_list[ind] = min_list[ind] + 1.5 * D1
+    im1 = cv2.imread(img1, cv2.IMREAD_COLOR)
+    im2 = cv2.imread(img2, cv2.IMREAD_COLOR)
+    # Convert images to grayscale
+    im1Gray = cv.cvtColor(im1, cv.COLOR_BGR2GRAY)
+    im2Gray = cv.cvtColor(im2, cv.COLOR_BGR2GRAY)
+
+    # Detect ORB features and compute descriptors.
+    orb = cv.ORB_create(MAX_FEATURES)
+    keypoints1, descriptors1 = orb.detectAndCompute(im1Gray, None)
+    keypoints2, descriptors2 = orb.detectAndCompute(im2Gray, None)
+
+    # Match features.
+    matcher = cv.DescriptorMatcher_create(cv.DESCRIPTOR_MATCHER_BRUTEFORCE_HAMMING)
+    matches = matcher.match(descriptors1, descriptors2, None)
+
+    # Sort matches by score
+    matches.sort(key=lambda x: x.distance, reverse=False)
+
+    # Remove not so good matches
+    numGoodMatches = int(len(matches) * GOOD_MATCH_PERCENT)
+    matches = matches[:numGoodMatches]
+
+    # Draw top matches
+    #imMatches = cv.drawMatches(im1, keypoints1, im2, keypoints2, matches, None)
+    #cv.imwrite("matches.jpg", imMatches)
+
+    # Extract location of good matches
+    points1 = np.zeros((len(matches), 2), dtype=np.float32)
+    points2 = np.zeros((len(matches), 2), dtype=np.float32)
+    points1_v2 =[]
+    points2_v2 = []
+
+    for i, match in enumerate(matches):
+        # print(keypoints1[match.queryIdx].pt[0])
+        # exit(0)
+        if max_list[int(keypoints1[match.queryIdx].pt[0])]< keypoints1[match.queryIdx].pt[1]:
+            points1[i, :] = keypoints1[match.queryIdx].pt
+            points1_v2.append([keypoints1[match.queryIdx].pt[0], keypoints1[match.queryIdx].pt[1]])
+            points2[i, :] = keypoints2[match.trainIdx].pt
+            points2_v2.append([keypoints2[match.trainIdx].pt[0], keypoints2[match.trainIdx].pt[1]])
+        # points1[i, :] = keypoints1[match.queryIdx].pt
+        # points2[i, :] = keypoints2[match.trainIdx].pt
+        #print(points1[i][0] - points2[i][0])
+    # Find homography
+    # print(points1_v2)
+    # print(points2_v2)
+    # exit(0)
+    matrix, mask = cv.findHomography(np.array(points1_v2), np.array(points2_v2), cv.RANSAC)
     a = np.array(matrix)
     return a
 
