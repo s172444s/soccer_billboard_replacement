@@ -207,12 +207,14 @@ if __name__ == "__main__":
 
         img = Image.open(image_lst[j])
         if j - base > 0:
-            A = homography_matrix(image_lst[base], image_lst[base+1])
+            if j - base == 1:
+                A = homography_matrix(image_lst[base], image_lst[base + 1])
             if j - base > 1:
-                for ii in range(j - base - 1):
-                    #A = A.dot(homography_matrix(image_lst[ii + 1], image_lst[ii + 2]))
+                A = A.dot(homography_matrix(image_lst[j-base-1], image_lst[j-base]))
+                # for ii in range(j - base - 1):
+                #     A = A.dot(homography_matrix(image_lst[ii + 1], image_lst[ii + 2]))
                     #A = homography_matrix(image_lst[ii + 1], image_lst[ii + 2]).dot(A)
-                    A = np.matmul(homography_matrix(image_lst[ii + 1], image_lst[ii + 2]), A)
+                    #A = np.matmul(homography_matrix(image_lst[ii + 1], image_lst[ii + 2]), A)
             B = np.array([[647, 553, 1]]).transpose()
             C = A.dot(B)
             c = C[0][0]/C[2][0]
@@ -223,10 +225,10 @@ if __name__ == "__main__":
             else:
                 base = j - 1
                 if j - base > 0:
-                    A = homography_matrix(image_lst[base], image_lst[base + 1])
+                    if j - base == 1:
+                        A = homography_matrix(image_lst[base], image_lst[base + 1])
                     if j - base > 1:
-                        for ii in range(j - base - 1):
-                            A = A.dot(homography_matrix(image_lst[ii + 1], image_lst[ii + 2]))
+                        A = A.dot(homography_matrix(image_lst[j - base - 1], image_lst[j - base]))
                     B = np.array([[647, 553, 1]]).transpose()
                     C = A.dot(B)
                     c = C[0][0] / C[2][0]
