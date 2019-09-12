@@ -220,7 +220,7 @@ if __name__ == "__main__":
             c = C[0][0]/C[2][0]
             d = C[1][0]/C[2][0]
             e = C[2][0]
-            if e < 1.5 and e > 0.5:
+            if c > 100:
                 point.append(c)
             else:
                 base = j - 1
