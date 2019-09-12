@@ -25,7 +25,7 @@ def homography_matrix(img1, img2):
     # Detect ORB features and compute descriptors.
     #orb = cv.ORB_create(MAX_FEATURES)
     orb = cv2.ORB_create(edgeThreshold=15, patchSize=31, nlevels=8, fastThreshold=20, scaleFactor=1.2, WTA_K=2,
-                         scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0, nfeatures=500000)
+                         scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0, nfeatures=1000000)
     keypoints1, descriptors1 = orb.detectAndCompute(im1Gray, None)
     keypoints2, descriptors2 = orb.detectAndCompute(im2Gray, None)
 
@@ -222,7 +222,9 @@ def static_point_detecor_homography(img1, img2):
     im2Gray = cv.cvtColor(im2, cv.COLOR_BGR2GRAY)
 
     # Detect ORB features and compute descriptors.
-    orb = cv.ORB_create(MAX_FEATURES)
+    #orb = cv.ORB_create(MAX_FEATURES)
+    orb = cv2.ORB_create(edgeThreshold=15, patchSize=31, nlevels=8, fastThreshold=20, scaleFactor=1.2, WTA_K=2,
+                         scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0, nfeatures=1000000)
     keypoints1, descriptors1 = orb.detectAndCompute(im1Gray, None)
     keypoints2, descriptors2 = orb.detectAndCompute(im2Gray, None)
 
