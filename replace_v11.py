@@ -208,7 +208,7 @@ if __name__ == "__main__":
         img = Image.open(image_lst[j])
         if j - base > 0:
             c, d, e = static_point_detecor_homography(image_lst[base], image_lst[j])
-            if e < 1.5 and e > 0.5:
+            if c > 100:
                 point.append(c)
             else:
                 base = j - 1
