@@ -213,6 +213,64 @@ def homography_matrix_v2(img1, img2):
     a = np.array(matrix)
     return a
 
+def billboard_point_tracker_homography(xx, yy, img1, img2):
+    #point = []
+    im1 = cv2.imread(img1, cv2.IMREAD_COLOR)
+    im2 = cv2.imread(img2, cv2.IMREAD_COLOR)
+    # Convert images to grayscale
+    im1Gray = cv.cvtColor(im1, cv.COLOR_BGR2GRAY)
+    im2Gray = cv.cvtColor(im2, cv.COLOR_BGR2GRAY)
+
+    # Detect ORB features and compute descriptors.
+    #orb = cv.ORB_create(MAX_FEATURES)
+    orb = cv2.ORB_create(edgeThreshold=15, patchSize=31, nlevels=8, fastThreshold=20, scaleFactor=1.2, WTA_K=2,
+                         scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0, nfeatures=2000000)
+    keypoints1, descriptors1 = orb.detectAndCompute(im1Gray, None)
+    keypoints2, descriptors2 = orb.detectAndCompute(im2Gray, None)
+
+    # Match features.
+    matcher = cv.DescriptorMatcher_create(cv.DESCRIPTOR_MATCHER_BRUTEFORCE_HAMMING)
+    matches = matcher.match(descriptors1, descriptors2, None)
+
+    # Sort matches by score
+    matches.sort(key=lambda x: x.distance, reverse=False)
+
+    # Remove not so good matches
+    numGoodMatches = int(len(matches) * GOOD_MATCH_PERCENT)
+    matches = matches[:numGoodMatches]
+
+    # Draw top matches
+    #imMatches = cv.drawMatches(im1, keypoints1, im2, keypoints2, matches, None)
+    #cv.imwrite("matches.jpg", imMatches)
+
+    # Extract location of good matches
+    points1 = np.zeros((len(matches), 2), dtype=np.float32)
+    points2 = np.zeros((len(matches), 2), dtype=np.float32)
+
+    for i, match in enumerate(matches):
+        points1[i, :] = keypoints1[match.queryIdx].pt
+        points2[i, :] = keypoints2[match.trainIdx].pt
+        #print(points1[i][0] - points2[i][0])
+    # Find homography
+    matrix, mask = cv.findHomography(points1, points2, cv.RANSAC)
+    A = np.array(matrix)
+    #B = np.array([[points1[0][0],points1[0][1],1]]).transpose()
+    B = np.array([[xx, yy, 1]]).transpose()
+    C = A.dot(B)
+    # print(C)
+    # print(C[0][0], C[1][0])
+    # exit(0)
+    #point.append(C[0][0])
+    # print(points2)
+    # print(C)
+    # exit(0)
+
+    # Use homography
+    height, width, channels = im2.shape
+    im1Reg = cv.warpPerspective(im1, matrix, (width, height))
+
+    return C[0][0]/C[2][0], C[1][0]/C[2][0], C[2][0]
+
 def static_point_detecor_homography(img1, img2):
     #point = []
     im1 = cv2.imread(img1, cv2.IMREAD_COLOR)
@@ -224,7 +282,7 @@ def static_point_detecor_homography(img1, img2):
     # Detect ORB features and compute descriptors.
     #orb = cv.ORB_create(MAX_FEATURES)
     orb = cv2.ORB_create(edgeThreshold=15, patchSize=31, nlevels=8, fastThreshold=20, scaleFactor=1.2, WTA_K=2,
-                         scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0, nfeatures=1000000)
+                         scoreType=cv2.ORB_HARRIS_SCORE, firstLevel=0, nfeatures=2000000)
     keypoints1, descriptors1 = orb.detectAndCompute(im1Gray, None)
     keypoints2, descriptors2 = orb.detectAndCompute(im2Gray, None)
 
