@@ -4,6 +4,7 @@ import os
 import numpy as np
 import torch
 import statistics
+import math
 import torch.nn.functional as F
 
 from pil import Image, ImageDraw
@@ -20,7 +21,7 @@ from torch.autograd import Variable
 def predict_img(net,
                 full_img,
                 scale_factor=0.25,
-                out_threshold=0.5,
+                out_threshold=0.1,
                 use_dense_crf=True,
                 use_gpu=True):
     net.eval()
@@ -29,6 +30,9 @@ def predict_img(net,
 
     img = resize_and_crop(full_img, scale=scale_factor)
     img = normalize(img)
+
+    if img.shape[2] == 4:
+        img = img[:,:,0:3]
 
     left_square, right_square = split_img_into_squares(img)
 
@@ -73,10 +77,10 @@ def predict_img(net,
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', '-m', default='CP1.pth',
+    parser.add_argument('--model', '-m', default='CP1_v3.pth',
                         metavar='FILE',
                         help="Specify the file in which is stored the model"
-                             " (default : 'CP1.pth')")
+                             " (default : 'CP1_v3.pth')")
     parser.add_argument('--input', '-i', metavar='INPUT', nargs='+',
                         help='filenames of input images', required=True)
 
@@ -117,12 +121,49 @@ def get_output_filenames(args):
         raise SystemExit()
     else:
         out_files = args.output
-
     return out_files
 
 
 def mask_to_image(mask):
     return Image.fromarray((mask * 255).astype(np.uint8))
+
+
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+
+    #       >>> angle_between((1, 0, 0), (0, 1, 0))
+            1.5707963267948966
+    #       >>> angle_between((1, 0, 0), (1, 0, 0))
+            0.0
+    #       >>> angle_between((1, 0, 0), (-1, 0, 0))
+            3.141592653589793
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+
+def rob_alg(lst):
+    while len(lst) > 5:
+        d = []
+        for i, val in enumerate(lst):
+            # print(i)
+            if i < len(lst) - 2:
+                p1 = np.array([i, lst[i]])
+                p2 = np.array([i + 2, lst[i + 2]])
+                p3 = np.array([i + 1, lst[i + 1]])
+                diff = np.linalg.norm(np.cross(p2 - p1, p1 - p3)) / np.linalg.norm(p2 - p1)
+                d.append(diff)
+        index = d.index(min(d))
+        print(len(lst))
+        lst.remove(lst[index])
+        print(len(lst))
+    return lst
 
 
 if __name__ == "__main__":
@@ -145,10 +186,24 @@ if __name__ == "__main__":
 
     print("Model loaded !")
 
-    for i, fn in enumerate(in_files):
-        print("\nPredicting image {} ...".format(fn))
+    import cv2
+    image_lst = []
+    vidcap = cv2.VideoCapture(in_files[0])
+    success, image = vidcap.read()
+    count = 0
+    while success:
+        cv2.imwrite("frame%d.jpg" % count, image)  # save frame as JPEG file
+        success, image = vidcap.read()
+        img_name = "frame"+str(count)+".jpg"
+        image_lst.append(img_name)
+        # print('Read a new frame: ', success)
+        count += 1
 
-        img = Image.open(fn)
+    for j in range(len(image_lst)):
+        #for i, fn in enumerate(image_lst[j]):
+        # print("\nPredicting image {} ...".format(image_lst[j]))
+
+        img = Image.open(image_lst[j])
         if img.size[0] < img.size[1]:
             print("Error: image height larger than the width")
 
@@ -158,33 +213,59 @@ if __name__ == "__main__":
                            out_threshold=args.mask_threshold,
                            use_dense_crf=not args.no_crf,
                            use_gpu=not args.cpu)
-        #print(mask)
+        # print(mask)
 
         is_billboard_y, is_billboard_x = np.where(mask > 0)
-        print(is_billboard_y.shape,is_billboard_x.shape)
+        print(is_billboard_y.shape, is_billboard_x.shape)
         import cv2
+
         numpy_image = np.array(img)
         opencv_image = cv2.cvtColor(numpy_image, cv2.COLOR_RGB2BGR)
         original_image = np.copy(opencv_image)
         # im_pil = Image.fromarray(img1)
         # opencv_image[mask>0] = 0
         # cv2.imshow('window_name', opencv_image)
-        #cv2.waitKey(0)
-        plot_img_and_mask(img, mask)
-        #exit(0)
+        # cv2.waitKey(0)
+        # plot_img_and_mask(img, mask)
+        # exit(0)
         # Read source image.
-        im_src = cv2.imread('frame1.jpg')
+        im_src = cv2.imread('framex.jpg')
         # Four corners of the billboard in source image
         img_gray = np.mean(im_src, axis=2)
         b, a = np.where(img_gray > 0)
         pts_src = np.array([[min(a), min(b)], [max(a), min(b)], [max(a), max(b)], [min(a), max(b)]])
 
         # Read destination image.
-        #im_dst = cv2.imread('billboard1.jpg')
+        # im_dst = cv2.imread('billboard1.jpg')
+        min_list = []
+        max_list = []
+        D_list = []
+        M_list = []
+        for x in range(0, opencv_image.shape[1]):  # looping through each column
+            lst = []
+            for y in range(0, opencv_image.shape[0]):  # looping through each rows
+                if mask[y, x] > 0:
+                    lst.append(y)
+            if np.any(mask[:, x] > 0):
+                min_list.append(min(lst))
+                max_list.append(max(lst))
+                # print(max_list[x], min_list[x])
+                ind = max_list.index(max(lst))
+                if max_list[ind] < min_list[ind]:
+                    k = min_list[ind]
+                    min_list[ind] = max_list[ind]
+                    max_list[ind] = k
+                D = max_list[ind] - min_list[ind]
+                D_list.append(D)
+                if D > 2 / 3 * statistics.mean(D_list) and D < 4 / 3 * statistics.mean(D_list):
+                    T = (max_list[ind] + min_list[ind]) / 2
+                    M_list.append(T)
+        # Mean_D = statistics.mean(D_list)
         im_dst = opencv_image
         min_list = []
         max_list = []
         D_list = []
+        Mean_list = []
         # Four corners of the billboard in destination image.
         for x in range(0, opencv_image.shape[1]):  # looping through each column
             lst = []
@@ -194,32 +275,75 @@ if __name__ == "__main__":
             if np.any(mask[:, x] > 0):
                 max_pt = (x, max(lst))
                 min_pt = (x, min(lst))
-                print(max_pt, min_pt)
+                # print(max_pt, min_pt)
                 min_list.append(min(lst))
                 max_list.append(max(lst))
                 # print(max_list[x], min_list[x])
                 ind = max_list.index(max(lst))
+                if max_list[ind] < min_list[ind]:
+                    k = min_list[ind]
+                    min_list[ind] = max_list[ind]
+                    max_list[ind] = k
                 D = max_list[ind] - min_list[ind]
                 D_list.append(D)
-                if D < 0.5*statistics.mean(D_list):
+                if D > 2 / 3 * statistics.mean(D_list) and D < 4 / 3 * statistics.mean(D_list):
+                    T = (max_list[ind] + min_list[ind]) / 2
+                    Mean_list.append(T)
+
+                if D != statistics.mean(D_list) and len(Mean_list) < len(M_list):
                     D = statistics.mean(D_list)
-                    T = (max_list[ind] + min_list[ind])//2
-                    max_list[ind] = T + D//2
-                    min_list[ind] = T - D // 2
-                D1 = 0.09 * D
+                    # T = Mean_list[-1]
+                    X = len(Mean_list)
+                    # print(X)
+                    # print(len(M_list))
+                    T = (M_list[X] + Mean_list[-1]) / 2
+                    # T = (max_list[ind] + min_list[ind])/2
+                    max_list[ind] = T + D / 2
+                    min_list[ind] = T - D / 2
+                D1 = 0.1 * D
                 max_list[ind] = max_list[ind] - D1
-                min_list[ind] = min_list[ind] + D1
-        length = len(max_list)-1
+                min_list[ind] = min_list[ind] + 1.5 * D1
+        length = len(max_list) - 1
+        ind = length
+        D = max_list[ind] - min_list[ind]
+        if D != statistics.mean(D_list) and len(Mean_list) == len(M_list):
+            D_mean = statistics.mean(D_list)
+            X = len(Mean_list)
+            T = (M_list[X - 1] + Mean_list[X - 2]) / 2
+            # T = (max_list[ind] + min_list[ind])/2
+            max_list[ind] = T + D_mean / 2
+            min_list[ind] = T - D_mean / 2
+        D1 = 0.1 * D
+        max_list[ind] = max_list[ind] - D1
+        min_list[ind] = min_list[ind] + 1.5 * D1
+        angle_list = []
         for x in range(0, length):
-            if x % 100 == 0 and x+99 < length:
+            if x > 0 and x < length - 200:
+                # print((180 / np.pi) * angle_between(np.array([0, 1])-np.array([1, 1]), np.array([1, 1])))
+                # exit(0)
+                ang = (180 / np.pi) * angle_between(
+                    np.array([x + 100, min_list[x + 100]]) - np.array([x, min_list[x]]),
+                    np.array([x + 200, min_list[x + 200]]) - np.array([x + 100, min_list[x + 100]]))
+                angle_list.append(ang)
+                # print(ang)
+                # if ang > 4:
+                #     print('Here', x+100)
+        ind_angle = angle_list.index(max(angle_list))
+        # print(ind_angle+100)
+        # print(rob_alg(min_list))
+        # exit(0)
+        for x in range(0, length):
+            if x % 100 == 0 and x + 99 < length:
                 if x == 0:
                     pts_dst = np.array(
-                        [[x, min_list[x]], [x + 99, min_list[x + 99]], [x + 99, max_list[x + 99]], [x, max_list[x]]])
-                    #print(pts_dst)
+                        [[x, min_list[x]], [x + 99, min_list[x + 99]], [x + 99, max_list[x + 99]],
+                         [x, max_list[x]]])
+                    # print(pts_dst)
                 else:
                     pts_dst = np.array(
-                        [[x-1, min_list[x-1]], [x + 99, min_list[x + 99]], [x + 99, max_list[x + 99]], [x-1, max_list[x-1]]])
-                    #print(pts_dst)
+                        [[x - 1, min_list[x - 1]], [x + 99, min_list[x + 99]], [x + 99, max_list[x + 99]],
+                         [x - 1, max_list[x - 1]]])
+                    # print(pts_dst)
 
                 # Calculate Homography
                 h, status = cv2.findHomography(pts_src, pts_dst)
@@ -230,16 +354,18 @@ if __name__ == "__main__":
                 cv2.fillConvexPoly(im_dst, pts_dst.astype(int), 0, 4)
 
                 im_dst = im_dst + temp
-                #im_dst = cv2.add(im_dst, temp)
+                # im_dst = cv2.add(im_dst, temp)
                 # show the process step by step
-                cv2.imshow("test", im_dst)
-                cv2.waitKey(0)
-            if x % 100 == 0 and x+99 >= length:
+                # cv2.imshow("test", im_dst)
+                # cv2.waitKey(0)
+            if x % 100 == 0 and x + 99 >= length:
                 pts_dst = np.array(
-                    [[x-1, min_list[x-1]], [len(min_list)-1, min_list[len(min_list)-1]], [len(min_list)-1, max_list[len(min_list)-1]], [x-1, max_list[x-1]]])
-                print(pts_dst)
-                print(max(a)-min(a))
-                cropped_src = np.array([[min(a), min(b)], [((length-x)/100)*max(a), min(b)], [((length-x)/100)*max(a), max(b)], [min(a), max(b)]])
+                    [[x - 1, min_list[x - 1]], [len(min_list) - 1, min_list[len(min_list) - 1]],
+                     [len(min_list) - 1, max_list[len(min_list) - 1]], [x - 1, max_list[x - 1]]])
+                # print(pts_dst)
+                # print(max(a)-min(a))
+                cropped_src = np.array([[min(a), min(b)], [((length - x) / 100) * max(a), min(b)],
+                                        [((length - x) / 100) * max(a), max(b)], [min(a), max(b)]])
                 # Calculate Homography
                 h, status = cv2.findHomography(cropped_src, pts_dst)
 
@@ -249,25 +375,32 @@ if __name__ == "__main__":
                 cv2.fillConvexPoly(im_dst, pts_dst.astype(int), 0, 4)
                 im_dst = im_dst + temp
                 # show the process step by step
-                cv2.imshow("test", im_dst)
-                cv2.waitKey(0)
+                # cv2.imshow("test", im_dst)
+                # cv2.waitKey(0)
 
         alpha = 0.25  # amount to mix between [0, 1]
-        cv2.imwrite('original_image.jpg', original_image)
-        cv2.imwrite('im_dst.jpg', im_dst)
+        # cv2.imwrite('original_image.jpg', original_image)
+        # cv2.imwrite('im_dst.jpg', im_dst)
         im_dst[:] = alpha * original_image + (1 - alpha) * im_dst
 
-        cv2.imshow('warpped', im_dst)
-        cv2.imwrite('replaced.jpg', im_dst)
-        cv2.waitKey(0)
-        exit(0)
-        if args.viz:
-            print("Visualizing results for image {}, close to continue ...".format(fn))
-            plot_img_and_mask(img, mask)
+        # cv2.imshow('warpped', im_dst)
+        cv2.imwrite("D:/Frames/frame%d.jpg" % int(j+1068), im_dst)
+        # cv2.waitKey(0)
 
-        if not args.no_save:
-            out_fn = out_files[i]
-            result = mask_to_image(mask)
-            result.save(out_files[i])
+import cv2
+import os
 
-            print("Mask saved to {}".format(out_files[i]))
+image_folder = 'D:/Frames'
+video_name = 'D:/Frames/video_second_set_replaced_v2.avi'
+
+images = [img for img in os.listdir(image_folder) if img.endswith(".jpg")]
+frame = cv2.imread(os.path.join(image_folder, images[0]))
+height, width, layers = frame.shape
+
+video = cv2.VideoWriter(video_name, 0, 50, (width,height))
+
+for image in images:
+    video.write(cv2.imread(os.path.join(image_folder, image)))
+
+cv2.destroyAllWindows()
+video.release()

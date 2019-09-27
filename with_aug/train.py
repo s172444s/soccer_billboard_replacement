@@ -2,27 +2,26 @@ import sys
 import os
 from optparse import OptionParser
 import numpy as np
-
+import matplotlib.pyplot as plt
 import torch
-import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from torch import optim
-
-from eval import eval_net
-from Network import UNet
-from utils import get_ids, split_ids, split_train_val, get_imgs_and_masks, get_imgs_and_masks_both, batch
+from final.eval import eval_net
+from final.Network import UNet
+from final.utils import get_ids, split_ids, split_train_val, get_imgs_and_masks, get_imgs_and_masks_both, batch
 
 def train_net(net,
-              epochs=10,
-              batch_size=2,
+              epochs=50,
+              batch_size=8,
               lr=0.1,
               val_percent=0.1,
               save_cp=True,
               gpu=True,
-              img_scale=0.5):
+              img_scale=0.25):
 
-    dir_img = 'C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/train_100/'
-    dir_mask = 'C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/train_100_masks/'
+
+    dir_img = 'C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/train/'
+    dir_mask = 'C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/train_masks/'
     dir_checkpoint = 'C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/checkpoints/'
     dir_checkpoint_temp = 'D:/checkpoints/'
 
@@ -58,28 +57,30 @@ def train_net(net,
         net.train()
 
         # reset the generators
-        # train = get_imgs_and_masks(iddataset['train'], dir_img, dir_mask, img_scale)
-        # val = get_imgs_and_masks(iddataset['val'], dir_img, dir_mask, img_scale)
+        train = get_imgs_and_masks(iddataset['train'], dir_img, dir_mask, img_scale)
+        val = get_imgs_and_masks(iddataset['val'], dir_img, dir_mask, img_scale)
 
-        train = get_imgs_and_masks_both(iddataset['train'], dir_img, dir_mask, img_scale)
-        val = get_imgs_and_masks_both(iddataset['val'], dir_img, dir_mask, img_scale)
+        # train = get_imgs_and_masks_both(iddataset['train'], dir_img, dir_mask, img_scale)
+        # val = get_imgs_and_masks_both(iddataset['val'], dir_img, dir_mask, img_scale)
 
         epoch_loss = 0
 
+
+        # number of iterations =
+
         ctr = 0
         ctr2 = 0
+        ctr3 = 0
         for i, b in enumerate(batch(train, batch_size)):
             ctr += 1
             imgs = np.array([i[0] for i in b]).astype(np.float32)
             true_masks = np.array([i[1] for i in b])
 
-            # print(true_masks.shape, true_masks.dtype)
-            # print(imgs.shape, true_masks.dtype, np.max(imgs), np.min(imgs))
-
-            # import cv2
-            # cv2.imwrite("test_mask.png", true_masks[0, 0, :, :]*255)
-            # cv2.imwrite("test_img.png", imgs[0, 0, :, :]*255)
-            # exit(0)
+            import cv2
+            #if i % 1000 == 0:
+            cv2.imwrite("D:/img_and_mask_test/test"+str(epoch)+str(int(i * batch_size / N_train))+str(i)+"_coords.PNG", true_masks[0, :, :, 0]*255)
+            cv2.imwrite("D:/img_and_mask_test/test" + str(epoch) + str(int(i * batch_size / N_train)) + str(i) + "_vis.PNG",
+                        imgs[0, 0, :, :] * 255)
 
             imgs = torch.from_numpy(imgs)
             true_masks = torch.from_numpy(true_masks)
@@ -97,16 +98,22 @@ def train_net(net,
             epoch_loss += loss.item()
             print(ctr)
             print('{0:.4f} --- loss: {1:.6f}'.format(i * batch_size / N_train, loss.item()))
-            if ctr == 1000:
+            if ctr == 500:
                 torch.save(net.state_dict(), dir_checkpoint_temp + 'CP{}'.format(epoch + 1) + '_' + str(ctr2) + '.pth')
-                os.system("predict.py --input C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/test/t5.jpg --num " + str(int(ctr2)) + " --model " + dir_checkpoint_temp + 'CP{}'.format(epoch + 1) + '_' + str(ctr2) + '.pth')
+                os.system("C:/Users/kamal.maanicshah/PycharmProjects/UNet/final/predict.py --input C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/test/t5.jpg --num " + str(int(ctr2)) + " --num2 " + str(epoch) + " --model " + dir_checkpoint_temp + 'CP{}'.format(epoch + 1) + '_' + str(ctr2) + '.pth')
                 ctr = 0
                 ctr2 += 1
+
                 print('Checkpoint {} saved !'.format(epoch + 1))
+            #print(int(i * batch_size / N_train))
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
+            #plt.plot(ctr3, loss.item(), color = 'red')
+            plt.scatter(ctr3,loss.item(),marker = ".")
+            plt.pause(0.05)
+            ctr3 += 1
         print('Epoch finished ! Loss: {}'.format(epoch_loss / i))
 
         if 1:
@@ -117,12 +124,14 @@ def train_net(net,
             torch.save(net.state_dict(),
                        dir_checkpoint + 'CP{}.pth'.format(epoch + 1))
             print('Checkpoint {} saved !'.format(epoch + 1))
+        plt.savefig("epoch_"+str(epoch)+".jpg")
+        plt.close()
 
 
 
 def get_args():
     parser = OptionParser()
-    parser.add_option('-e', '--epochs', dest='epochs', default=10, type='int',
+    parser.add_option('-e', '--epochs', dest='epochs', default=50, type='int',
                       help='number of epochs')
     parser.add_option('-b', '--batch-size', dest='batchsize', default=2,
                       type='int', help='batch size')

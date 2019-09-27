@@ -4,11 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 #import pydensecrf.densecrf as dcrf
 from PIL import Image
-import cv2
-from numpy import newaxis
 import torchvision
 from torchvision import transforms
-import random
 
 
 
@@ -42,7 +39,7 @@ def resize_and_crop(pilimg, scale=0.25, final_height=None, is_mask=False):
         diff = newH - final_height
 
     #trans = transforms.Compose([transforms.RandomResizedCrop(270)])
-    if is_mask:
+    if is_mask and len(np.array(pilimg).shape) == 3:
         # convert to numpy array, remove alpha channel, convert back to pilimag
         # otherwise pilimg resize will make the image transparent (all black)
         pilimg = np.array(pilimg)
@@ -50,11 +47,13 @@ def resize_and_crop(pilimg, scale=0.25, final_height=None, is_mask=False):
         pilimg = Image.fromarray(pilimg)
         pilimg = pilimg.resize((newW, newH))
         img = pilimg.crop((0, 0, newW, newH))
-        #img = trans(pilimg)
+        # pilimg = pilimg.resize((270, 270))
+        # img = pilimg.crop((0, 0, 270, 270))
     else:
         pilimg = pilimg.resize((newW, newH))
         img = pilimg.crop((0, 0, newW, newH))
-        #img = trans(pilimg)
+        # pilimg = pilimg.resize((270, 270))
+        # img = pilimg.crop((0, 0, 270, 270))
 
     # plot_img_and_mask(img, img)
     # print(is_mask)
@@ -159,8 +158,16 @@ def to_cropped_imgs(ids, dir, suffix, scale, is_mask=False):
     """From a list of tuples, returns the correct cropped img"""
     for id, pos in ids:
         im = resize_and_crop(Image.open(dir + id + suffix), scale=scale, is_mask=is_mask)
-
-        if is_mask:
+        if len(np.array(im).shape) != 3:
+            import cv2
+            im = np.atleast_3d(im)
+            im = cv2.merge((im, im, im))
+        #import cv2
+        # cv2.imwrite("test2.png", im*255)
+        # exit(0)
+        # print(np.array(im).shape)
+        # exit(0)
+        if is_mask and len(np.array(im).shape) == 3:
             # change to mask 0 or 1, 1 is for billboards
             im = im.any(axis=2, keepdims=True).astype(im.dtype)
             # import cv2
@@ -285,166 +292,72 @@ def resize_and_crop_img_and_mask(pilimg_img, pilimg_mask, scale=1, final_height=
 
     return im, mask
 
-def distorter(width, height, img, mask):
-    max_side = max(height, width)
-    x_max = width / max_side
-    y_max = height / max_side
 
-    # "normalized" coordinates
-    x_normalized = np.empty([height, width], np.float32)
-    y_normalized = np.empty([height, width], np.float32)
-
-    # scale to be [0, x_max] X [0, y_max]
-    x_normalized[:, :] = np.linspace(0, x_max, width, endpoint=False)[np.newaxis, :]
-    y_normalized[:, :] = np.linspace(0, y_max, height, endpoint=False)[:, np.newaxis]
-
-    # shift so that [0, 0] is the middle of the image
-    x_normalized = x_normalized - x_max / 2
-    y_normalized = y_normalized - y_max / 2
-
-    # do the transformation on normalized coordinates
-    c = np.array([0.0, 0.0], dtype=np.float32)
-    k = 0.1
-    cx = c[0]
-    cy = c[1]
-    radius_squared = (x_normalized - cx) ** 2 + (y_normalized - cy) ** 2
-    radius = np.sqrt(radius_squared)
-
-    f = 1.0 / (1 - k * radius)
-
-    x_transformed = (x_normalized - cx) * f + cx
-    y_transformed = (y_normalized - cy) * f + cy
-    #x_transformed, y_transformed = random_perspective(x_normalized, y_normalized)
-
-    # return to original lookup coordinates
-    x_lookup = max_side * (x_transformed + x_max / 2)
-    y_lookup = max_side * (y_transformed + y_max / 2)
-
-    interpolation = cv2.INTER_LINEAR
-    borderMode = cv2.BORDER_CONSTANT
-    transformed_img = cv2.remap(img, x_lookup, y_lookup, interpolation=interpolation, borderMode=borderMode)
-    transformed_mask = cv2.remap(mask, x_lookup, y_lookup, interpolation=interpolation, borderMode=borderMode)
-    return transformed_img, transformed_mask
-
-def perspector(width, height, img, mask):
-    max_side = max(height, width)
-    x_max = width / max_side
-    y_max = height / max_side
-
-    # "normalized" coordinates
-    x_normalized = np.empty([height, width], np.float32)
-    y_normalized = np.empty([height, width], np.float32)
-
-    # scale to be [0, x_max] X [0, y_max]
-    x_normalized[:, :] = np.linspace(0, x_max, width, endpoint=False)[np.newaxis, :]
-    y_normalized[:, :] = np.linspace(0, y_max, height, endpoint=False)[:, np.newaxis]
-
-    # shift so that [0, 0] is the middle of the image
-    x_normalized = x_normalized - x_max / 2
-    y_normalized = y_normalized - y_max / 2
-    x_transformed = (x_normalized + 0.1 * (y_normalized ** 2)) / (1 + 0.01 * x_normalized + 0.1 * (x_normalized ** 2))
-    y_transformed = (y_normalized + 0.1 * (x_normalized ** 2)) / (1 + 0.01 * y_normalized + 0.1 * (y_normalized ** 2))
-    x_lookup = max_side * (x_transformed + x_max / 2)
-    y_lookup = max_side * (y_transformed + y_max / 2)
-
-    interpolation = cv2.INTER_LINEAR
-    borderMode = cv2.BORDER_CONSTANT
-    transformed_img = cv2.remap(img, x_lookup, y_lookup, interpolation=interpolation, borderMode=borderMode)
-    transformed_mask = cv2.remap(mask, x_lookup, y_lookup, interpolation=interpolation, borderMode=borderMode)
-    return transformed_img, transformed_mask
-
-def resize_and_crop_img_and_mask_v2(pilimg_img, pilimg_mask, id, scale=1, final_height=None, is_mask=False):
+def resize_and_crop_img_and_mask_v2(pilimg_img, pilimg_mask, scale=1, final_height=None, is_mask=False):
     h = pilimg_img.size[0]
     w = pilimg_img.size[1]
+    newW = int(w * scale)
+    newH = int(h * scale)
+    if not final_height:
+        diff = 0
+    else:
+        diff = newH - final_height
+    if is_mask and len(np.array(pilimg_mask).shape) == 3:
+        pilimg_mask = np.array(pilimg_mask)
+        pilimg_mask = pilimg_mask[:, :, :3]  # remove alpha channel
+        pilimg_mask = Image.fromarray(pilimg_mask)
+
     im, mask = np.array(pilimg_img, dtype=np.float32), np.array(pilimg_mask, dtype=np.float32)
     # change to mask 0 or 1, 1 is for billboards
     mask = mask.any(axis=2, keepdims=True).astype(mask.dtype)
-    rdm = np.random.randint(0,4)
-    if rdm == 0:
-        target_Width = np.random.randint(400, 1080)
-        target_Height = np.random.randint(500, 1920)
+    # target_Width =810
+    # target_Height = 1440
+    i = 0
+    while True:
+        target_Width = np.random.randint(800, 1080)
+        target_Height = int(target_Width * 1920 / 1080)
+        x0 = np.random.randint(target_Width//2, w-target_Width//2)
+        y0 = np.random.randint(target_Height//2, h-target_Height//2)
+        im1 = im[y0-target_Height//2:y0+target_Height//2, x0-target_Width//2:x0+target_Width//2]
+        mask1 = mask[y0 - target_Height // 2:y0 + target_Height // 2, x0 - target_Width // 2:x0 + target_Width // 2]
+        i = i+1
+        if np.any(mask1[:, :, 0] == 1):
+            im = im1
+            mask = mask1
+            break
+        elif i == 100:
+            im = im1
+            mask = mask1
+            break
+    import cv2
+    from numpy import newaxis
+    im = cv2.resize(im, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
+    mask = cv2.resize(mask, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
+    mask = mask[:, :, newaxis]
 
-        no_board = True
-        ctr = 0
-        while(no_board == True):
-            ctr += 1
-            x0 = np.random.randint(target_Width // 2, w - target_Width // 2)
-            y0 = np.random.randint(target_Height // 2, h - target_Height // 2)
-            #x0 = int(546)
-            #y0 = int(1800)
-            diff = abs(x0-y0)
-            if diff > 400:
-                y0 = x0+400
-            new_im = im[y0 + 1 - target_Height // 2:y0 - 1 + target_Height // 2, x0 + 1 - target_Width // 2:x0 - 1 + target_Width // 2]
-            new_mask = mask[y0 - target_Height // 2:y0 + target_Height // 2, x0 - target_Width // 2:x0 + target_Width // 2]
-            if (new_mask.any() == False) & (ctr < 10):
-                continue
-            # print("x0 "+str(x0))
-            # print("y0 "+str(y0))
-            # print(id)
-            #cv2.imwrite('created/' + id + '_image.PNG', np.asarray(new_im))
-            #cv2.imwrite('created/' + id + '_mask.PNG', np.asarray(mask))
-            new_im = cv2.resize(new_im, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
-            new_mask = cv2.resize(new_mask, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
-            new_mask = new_mask[:, :, newaxis]
-            msk = np.copy(new_mask)
-            msk[msk==1] = 255
-            #print("bill_board")
-            #cv2.imwrite('created/' + id + '_image.PNG', np.asarray(new_im))
-            #cv2.imwrite('created/' + id + '_mask.PNG', np.asarray(msk))
-            no_board = False
-    elif rdm == 1:
-        new_im = cv2.resize(im, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
-        new_mask = cv2.resize(mask, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
-        new_mask = new_mask[:, :, newaxis]
-        msk = np.copy(new_mask)
-        msk[msk == 1] = 255
-        # cv2.imwrite('created/' + id + '_image.PNG', np.asarray(new_im))
-        # cv2.imwrite('created/' + id + '_mask.PNG', np.asarray(msk))
-    elif rdm == 2:
-        im, mask = distorter(h,w,im,mask)
-        new_im = cv2.resize(im, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
-        new_mask = cv2.resize(mask, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
-        new_mask = new_mask[:, :, newaxis]
-        msk = np.copy(new_mask)
-        msk[msk == 1] = 255
-        # cv2.imwrite('created/' + id + '_image.PNG', np.asarray(new_im))
-        # cv2.imwrite('created/' + id + '_mask.PNG', np.asarray(msk))
-    elif rdm == 3:
-        im, mask = perspector(h, w, im, mask)
-        new_im = cv2.resize(im, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
-        new_mask = cv2.resize(mask, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
-        new_mask = new_mask[:, :, newaxis]
-        msk = np.copy(new_mask)
-        msk[msk == 1] = 255
-        #cv2.imwrite('created/' + id + '_image.PNG', np.asarray(new_im))
-        #cv2.imwrite('created/' + id + '_mask.PNG', np.asarray(msk))
-    #cv2.imwrite('created/' + id + '_image.PNG', np.asarray(new_im))
-    #cv2.imwrite('created/' + id + '_mask.PNG', np.asarray(msk))
-    return new_im, new_mask
+    return np.array(im, dtype=np.float32), np.array(mask, dtype=np.float32)
 
 
 def resize_and_crop_for_predict(pilimg, scale=1, final_height=None):
-    w = pilimg.size[0]
-    h = pilimg.size[1]
+    h = pilimg.size[0]
+    w = pilimg.size[1]
     newW = int(w * scale)
     newH = int(h * scale)
-
     if not final_height:
         diff = 0
     else:
         diff = newH - final_height
 
-    trans = transforms.Compose([transforms.RandomResizedCrop(540)])
-    # pilimg = pilimg.resize((newW // 4, newH // 4))
-    # img = pilimg.crop((0, 0, newW // 4, newH // 4))
-    img = trans(pilimg)
-
-    # plot_img_and_mask(img, img)
-    # print(is_mask)
-    # exit(0)
-    #img = img.crop((0, diff // 2, newW, newH - diff // 2))
-    return np.array(img, dtype=np.float32)
+    im = np.array(pilimg, dtype=np.float32)
+    target_Width = 810
+    target_Height = 1440
+    x0 = np.random.randint(target_Width // 2, w - target_Width // 2)
+    y0 = np.random.randint(target_Height // 2, h - target_Height // 2)
+    im = im[y0 - target_Height // 2:y0 + target_Height // 2, x0 - target_Width // 2:x0 + target_Width // 2]
+    import cv2
+    im = cv2.resize(im, dsize=(540, 540), interpolation=cv2.INTER_LINEAR)
+    #return im
+    return np.array(im, dtype=np.float32)
 
 
 def to_cropped_imgs_and_mask(ids, dir_img, suffix_img, dir_mask, suffix_mask, scale, is_mask=False):
@@ -454,29 +367,22 @@ def to_cropped_imgs_and_mask(ids, dir_img, suffix_img, dir_mask, suffix_mask, sc
 
     #print(type(ids), len(ids))
 
-    for i in range(10):
+    for i in range(2):
         print(i)
         for id, pos in ids:
             #print(id, pos)
 
             im, mask = resize_and_crop_img_and_mask_v2(Image.open(dir_img + id + suffix_img),
-                                                       Image.open(dir_mask + id + suffix_mask), id, scale=scale,
+                                                       Image.open(dir_mask + id + suffix_mask), scale=scale,
                                                        is_mask=is_mask)
-
-            # if is_mask:
-            #     # change to mask 0 or 1, 1 is for billboards
-            #     mask = mask.any(axis=2, keepdims=True).astype(mask.dtype)
-            #     # import cv2
-            #     # cv2.imwrite("test.png", im*255)
 
             im_switched = hwc_to_chw(im)  # switches channels axis
             mask_switched = hwc_to_chw(mask)
 
-            #im_normalized = normalize(im_switched)  # normalizes image [0, 1]
+            im_normalized = normalize(im_switched)  # normalizes image [0, 1]
             # mask already in range [0, 1]
 
-            #final_im = im_normalized
-            final_im = im_switched
+            final_im = im_normalized
             final_mask = mask_switched
             # # debug
             # import cv2
@@ -490,7 +396,6 @@ def to_cropped_imgs_and_mask(ids, dir_img, suffix_img, dir_mask, suffix_mask, sc
             yield final_im, final_mask
 
 
-
 def get_imgs_and_masks_both(ids, dir_img, dir_mask, scale):
     """Return all the couples (img, mask)"""
     imgs_and_masks = to_cropped_imgs_and_mask(ids, dir_img, '_vis.PNG', dir_mask, '_coords.PNG', scale, is_mask=True)
@@ -502,6 +407,7 @@ def get_imgs_and_masks_both(ids, dir_img, dir_mask, scale):
     #return zip(imgs_normalized, masks)
 
     return imgs_and_masks
+
 
 # def get_full_img_and_mask(id, dir_img, dir_mask):
 #     im = Image.open(dir_img + id + '_vis.PNG')

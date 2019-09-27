@@ -3,24 +3,22 @@ import os
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 from PIL import Image
 
-from Network import UNet
-from vv_edit.utils2 import resize_and_crop, normalize, split_img_into_squares, hwc_to_chw, merge_masks
-from vv_edit.utils2 import plot_img_and_mask
+from final.Network import UNet
+from final.utils import resize_and_crop, normalize, split_img_into_squares, hwc_to_chw, merge_masks
+from final.utils import plot_img_and_mask
+
+from torchvision import transforms
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from torchvision import transforms
-
-
 def predict_img(net,
                 full_img,
-                scale_factor=1,
-                out_threshold=0.5,
+                scale_factor=0.25,
+                out_threshold=0.2,
                 use_dense_crf=True,
                 use_gpu=True):
     net.eval()
@@ -73,7 +71,7 @@ def predict_img(net,
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', '-m', default='C:/Users/kamal.maanicshah/PycharmProjects/UNet/ata/temp_checkpoints/',
+    parser.add_argument('--model', '-m', default='D:/checkpoints/CP1_9.pth',
     #parser.add_argument('--model', '-m', default='data/checkpoints/CP1.pth',
                         metavar='FILE',
                         help="Specify the file in which is stored the model"
@@ -85,8 +83,8 @@ def get_args():
                         help='filenames of ouput images')
     parser.add_argument('--cpu', '-c', action='store_true',
                         help="Do not use the cuda version of the net",
-                        #default = False)
                         default = True)
+                        #default = True)
     parser.add_argument('--viz', '-v', action='store_true',
                         help="Visualize the images as they are processed",
                         default=False)
@@ -98,11 +96,13 @@ def get_args():
                         default=True)
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
-                        default=0.0)
+                        default=0.1)
     parser.add_argument('--scale', '-s', type=float,
                         help="Scale factor for the input images",
-                        default=1)
+                        default=0.5)
     parser.add_argument('--num', '-nu', type=str,
+                        help="a temporary label", required=True)
+    parser.add_argument('--num2', '-nu2', type=str,
                         help="a temporary label", required=True)
 
     return parser.parse_args()
@@ -164,10 +164,8 @@ if __name__ == "__main__":
                            use_gpu=not args.cpu)
         print(mask)
         #plot_img_and_mask(img, mask)
-        plt.imsave("C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/Predict/" + fn.split("/")[-1] + "_" + args.num +  ".png", mask, cmap=cm.gray)
-
-
-
+        plt.imsave("C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/Predict/" + fn.split("/")[
+            -1] + "_" + args.num2 + "_" + args.num + ".png", mask, cmap=cm.gray)
         exit(0)
         if args.viz:
             print("Visualizing results for image {}, close to continue ...".format(fn))

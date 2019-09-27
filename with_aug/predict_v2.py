@@ -5,9 +5,10 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from PIL import Image
+from pil import Image
 
-from Network import UNet
+#from Network import UNet
+from Network_v2 import UNet
 from utils import resize_and_crop, normalize, split_img_into_squares, hwc_to_chw, merge_masks, resize_and_crop_for_predict
 from utils import plot_img_and_mask
 
@@ -16,7 +17,7 @@ from torchvision import transforms
 
 def predict_img(net,
                 full_img,
-                scale_factor=1,
+                scale_factor=0.5,
                 out_threshold=0.5,
                 use_dense_crf=True,
                 use_gpu=True):
@@ -25,9 +26,9 @@ def predict_img(net,
     img_width = full_img.size[0]
 
     #img = resize_and_crop(full_img, scale=scale_factor)
-    # img = resize_and_crop_for_predict(full_img, scale=scale_factor)
-    full_img = np.array(full_img,dtype=np.float32)
-    img = normalize(full_img)
+    #img = resize_and_crop_for_predict(full_img, scale=scale_factor)
+    img = np.array(full_img,dtype=np.float32)
+    img = normalize(img)
 
     left_square, right_square = split_img_into_squares(img)
 
@@ -76,7 +77,7 @@ def predict_img(net,
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', '-m', default='C:/Users/kamal.maanicshah/PycharmProjects/UNet/data/checkpoints/CP1.pth',
+    parser.add_argument('--model', '-m', default='random.pth',
                         metavar='FILE',
                         help="Specify the file in which is stored the model"
                              " (default : 'random.pth')")
@@ -99,11 +100,10 @@ def get_args():
                         default=False)
     parser.add_argument('--mask-threshold', '-t', type=float,
                         help="Minimum probability value to consider a mask pixel white",
-                        default=0.1)
+                        default=0.5)
     parser.add_argument('--scale', '-s', type=float,
                         help="Scale factor for the input images",
                         default=0.5)
-
 
     return parser.parse_args()
 
